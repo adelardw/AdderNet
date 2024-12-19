@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from masked_conv import *
-from mobile_block import MobileBlock
+from pipeline.masked_conv import *
+from pipeline.mobile_block import MobileBlock
 
 def list_fn(num_blocks, params):
     """
@@ -52,10 +52,8 @@ class BaseBlock(nn.Sequential):
         pad = kernel_size // 2
         if inverted:
             self.conv_inverted = nn.ConvTranspose2d(in_channels, out_channels, kernel_size,padding = pad)
-            #self.conv_inverted2 = nn.ConvTranspose2d(out_channels, out_channels, kernel_size,padding = pad)
         else:
-            #self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size,padding = pad)
-            #self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size, padding = pad)
+
             self.conv = OutMaskedConv2d(in_channels, out_channels, kernel_size, padding = pad)
         self.nb =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
         self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
@@ -117,11 +115,7 @@ class AdaptiveResBlock(nn.Module):
                                        inverted=inverted,
                                        do_bn=do_bn)
         if not downscaling:
-            self.scale = nn.ConvTranspose2d(in_channels=out_channels,
-                                            out_channels=out_channels,
-                                            kernel_size=3,
-                                            stride=2,
-                                            bias=False)
+            self.scale = nn.Upsample(scale_factor=2)
         elif downscaling:
             self.scale = nn.MaxPool2d(kernel_size=2)
         else:

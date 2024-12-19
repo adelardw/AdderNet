@@ -14,14 +14,17 @@ class SiSDRLoss(nn.Module):
 
     def forward(self, output, target):
 
-        alpha = torch.sum(output * target, dim=-1,keepdim=True) / torch.sum(target**2, dim=-1,keepdim=True) 
+        alpha = torch.sum(output * target, dim=-1,keepdim=True) / torch.norm(target)**2 
+
         proj = alpha * target
-        calc = torch.log10(torch.sum(proj**2) + self.eps)  - torch.log10(torch.sum((proj - output)**2) + self.eps)
 
-        return 10 * calc
+        proj_norm = torch.norm(proj)
+        diff_norm = torch.norm((proj - output))
+
+        return  -10 * torch.Tensor(torch.log10(proj_norm**2 / (diff_norm**2 + self.eps )))
 
 
-class CRIMLoss(nn.Module):
+class CIRMLoss(nn.Module):
     def __init__(self, k: int | float = 10, c: float  = 0.1):
         """
 

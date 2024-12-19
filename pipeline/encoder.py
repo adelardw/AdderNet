@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from general_blocks import *
+from pipeline.general_blocks import *
 from typing import List
 from collections import OrderedDict
 
@@ -56,5 +56,5 @@ class SpectrumEncoder(nn.Sequential):
         self.encoder_features = nn.Sequential(OrderedDict([(f"layer_{i}", layer) for i, layer
                                               in enumerate(blocks)]))
 
-        self.avg_pooler = nn.AdaptiveAvgPool2d((1,1))
+        #self.avg_pooler = nn.AdaptiveAvgPool2d((1,1))
 

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from general_blocks import *
+from pipeline.general_blocks import *
 from typing import List
 from collections import OrderedDict
 

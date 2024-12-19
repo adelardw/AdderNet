@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from masked_conv import *
+from pipeline.masked_conv import *
 
 
 class MobileBlock(nn.Sequential):

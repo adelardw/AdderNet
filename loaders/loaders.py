@@ -65,19 +65,25 @@ class SpeechNoiseDataset(Dataset):
                  noise_dir,
                  sample_rate=16000,
                  transform=None,
-                 padding_strategy="longest"):
+                 padding_strategy="longest",
+                 num_secodns = 8
+                 ):
         self.speech_files = speech_files
         self.noise_files = load_files(noise_dir)
         self.sample_rate = sample_rate
+        self.num_secodns = num_secodns
         self.transform = transform
         self.padding_strategy = padding_strategy
 
-        if self.padding_strategy == "average":
-            self.audio_length = self.calculate_audio_length(method="average")
-        elif self.padding_strategy == "median":
-            self.audio_length = self.calculate_audio_length(method="median")
-        elif self.padding_strategy == "longest":
-            self.audio_length = self.calculate_audio_length(method="longest")
+        if padding_strategy:
+            if self.padding_strategy == "average":
+                self.audio_length = self.calculate_audio_length(method="average")
+            elif self.padding_strategy == "median":
+                self.audio_length = self.calculate_audio_length(method="median")
+            elif self.padding_strategy == "longest":
+                self.audio_length = self.calculate_audio_length(method="longest")
+        else:
+            self.audio_length = self.num_secodns * self.sample_rate
 
     def calculate_audio_length(self, method="longest"):
         """

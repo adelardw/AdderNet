@@ -1,5 +1,23 @@
 import torch
 from typing import Optional
+import torch.nn.functional as F
+
+
+def resize_tensor(input_tensor, target_tensor):
+    """
+    Расширяет или обрезает input_tensor до размера target_tensor.
+    
+    Args:
+        input_tensor (torch.Tensor): 
+        target_tensor (torch.Tensor): 
+    
+    Returns:
+        torch.Tensor: Тензор с размером target_tensor.
+    """
+    target_size = target_tensor.shape
+    
+    return F.interpolate(input_tensor, size=target_size[-2:])
+
 
 def stft_multichannel_reshape(audio: torch.Tensor, n_fft: int, hop_length: int, win_length: Optional[int]=None,
                               window: Optional[torch.Tensor]=None):
@@ -15,7 +33,6 @@ def stft_multichannel_reshape(audio: torch.Tensor, n_fft: int, hop_length: int, 
     Returns:
         torch.Tensor: STFT Amplitude
     """
-    
     batch_size, channels, time = audio.shape
     audio_reshaped = audio.reshape(-1, time)
 
@@ -46,7 +63,26 @@ def stft_multichannel(audio: torch.Tensor, n_fft: int, hop_length: int, win_leng
     answ = []
     for c in  range(channels):
         mono_channel = audio[:, c, :]
-        stft_amplitude = torch.stft(mono_channel, n_fft, hop_length, win_length, window,   return_complex=True)
-        answ.append(stft_amplitude)
+        stft = torch.stft(mono_channel, n_fft, hop_length, win_length, window,   return_complex=True)
+        answ.append(stft)
     
+    return torch.stack(answ, dim=1)
+
+
+def masked_istft_multichannel(outs, inputs, n_fft=512, hop_length=128, center = True):
+    
+    b, c, f, t = outs.shape
+    
+    outs = resize_tensor(outs, inputs)
+
+    masked = outs * inputs
+    
+    answ = []
+    for ch in range(c):
+        channel = masked[:, ch, ...]
+
+        complex_channel = torch.complex(channel, torch.zeros_like(channel))
+        istft_c = torch.istft(complex_channel, n_fft=n_fft, hop_length=hop_length, center=center, return_complex=False)
+        answ.append(istft_c)
+
     return torch.stack(answ, dim=1)
