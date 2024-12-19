@@ -53,7 +53,7 @@ class BaseBlock(nn.Sequential):
         if inverted:
             self.conv_inverted = nn.ConvTranspose2d(in_channels, out_channels, kernel_size,padding = pad)
         else:
-
+            #self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding = pad)
             self.conv = OutMaskedConv2d(in_channels, out_channels, kernel_size, padding = pad)
         self.nb =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
         self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
