@@ -3,7 +3,7 @@ from pipeline import *
 from lightning.pytorch.callbacks import ModelCheckpoint
 import torch.optim as optim
 import lightning as L
-import librosa
+import torchaudio
 
 train_loader, val_loader, test_loader = get_loaders(speech_dirs=["dev-clean", "test-clean"],
                                                     noise_dir="./wham_noise//wham_noise",
@@ -12,6 +12,37 @@ train_loader, val_loader, test_loader = get_loaders(speech_dirs=["dev-clean", "t
 
 
 
+
+encoder_attributes= dict(in_channels=2,
+                        out_channels = [8, 16 , 32], 
+                        kernel_sizes = [3, 5, 5],
+                        use_mobile = False,
+                        act_func = nn.Tanh(),
+                        do_bn = [False, True, True],
+                        do_sc = [False, True, True],
+                        dp = [0.2, 0.2],
+                        num_blocks = 3)
+
+
+
+
+decoder_attributes = dict(in_channels=32, 
+                        out_channels = [16, 8, 1], 
+                        kernel_sizes = [5, 5, 3],
+                        use_mobile = False,
+                        act_func =nn.Tanh(),
+                        do_bn = [False, True, True],
+                        do_sc = [True, True, True], 
+                        dp = [0.3, 0.4, 0.4],
+                        num_blocks = 3)
+
+
+model_attributes = dict(n_fft =1022,
+                    hop_length = 250,
+                    center = True,
+                    input_signal_size = 80000,
+                    encoder_parameters = encoder_attributes,
+                    decoder_parameters = decoder_attributes)
 
 class SpectrogramLightningModel(L.LightningModule):
     def __init__(self, attributes):
