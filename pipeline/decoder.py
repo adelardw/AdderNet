@@ -28,7 +28,7 @@ class SpectrumDecoder(nn.Sequential):
             use_mobile (List[bool] | bool ): list of use_mobile parameters for each blocks. Defaults to True.
             act_func (List[nn.Module] | nn.Module ):  list of activation functions for each blocks. Defaults to nn.SiLU().
             do_bn (List[bool] | bool ): list of do_bn for each blocks. Defaults to True.
-            do_sc (List[bool] | bool ): list of do_bn for each blocks. Defaults to True.
+            do_sc (List[bool] | bool ): list of do_sc for each blocks. Defaults to True.
             dp (float | int | List[float] | int ): list of dp for each blocks. Defaults to 0.4.
             num_blocks (int ): Num blocks. Defaults to 3.
             

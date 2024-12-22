@@ -21,7 +21,7 @@ class SiSDRLoss(nn.Module):
         proj_norm = torch.norm(proj, dim=-1)
         diff_norm = torch.norm((proj - output), dim=-1)
 
-        return  (10 * (torch.log10(proj_norm**2 / (diff_norm**2 + self.eps )))).mean()
+        return  -(10 * (torch.log10(proj_norm**2 / (diff_norm**2 + self.eps )))).mean()
 
 
 class CIRMLoss(nn.Module):

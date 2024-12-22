@@ -53,7 +53,7 @@ class DenoisingModel(nn.Module):
                         n_fft: int = 512,
                         hop_length: int = 128,
                         center: bool = True,
-                        hidden_gru: int = 512,
+                        hidden_gru: int = 2048,
                         num_gru_cells: int = 2,
                         dp_gru = 0.3):
         """
@@ -99,7 +99,7 @@ class DenoisingModel(nn.Module):
         scaled_frequnecy = input_stft_size[0] // features_scaling
 
         self.encoder = SpectrumEncoder(**encoder_parameters)
-        self.decoder = SpectrumDecoder(**decoder_parameters)
+        
         
         self.gru = nn.GRU(input_size=encoder_parameters['out_channels'][-1] * scaled_frequnecy, 
                           hidden_size=hidden_gru,
@@ -108,7 +108,11 @@ class DenoisingModel(nn.Module):
                           num_layers=num_gru_cells,
                           bias=False)
         
-        self.linear = nn.Linear(hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy)
+        self.tanh = nn.Tanh()
+        self.linear = nn.Linear(hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy, bias=False)
+        self.decoder = SpectrumDecoder(**decoder_parameters)
+
+        
 
 
     def forward(self, x):
@@ -122,10 +126,11 @@ class DenoisingModel(nn.Module):
 
         x = x.reshape(batch_size, time, input_size)
         
-        gru_out, hidden = self.gru(x)     
-
-        out = self.linear(gru_out)
+        gru_out, hidden = self.gru(x)
+        out = self.tanh(gru_out)
+        out = self.linear(out)
         decoder_input = out.view(batch_size, channels,frequency, time)
+
         decoded = self.decoder(decoder_input)
 
         return decoded

@@ -13,14 +13,15 @@ train_loader, val_loader, test_loader = get_loaders(speech_dirs=["dev-clean", "t
 
 
 
-class LightningModel(L.LightningModule):
+class SpectrogramLightningModel(L.LightningModule):
     def __init__(self, attributes):
         super().__init__()
         
         self.n_fft = attributes['n_fft'] 
         self.hop_length = attributes['hop_length']
+        self.stft = torchaudio.transforms.Spectrogram(n_fft = self.n_fft, hop_length=self.hop_length, center=False, normalized=True)
         self.model = DenoisingModel(**attributes)
-        #self.mae = nn.L1Loss()
+        
         self.mse = nn.MSELoss()
         self.sisdr = SiSDRLoss() 
         
@@ -29,7 +30,7 @@ class LightningModel(L.LightningModule):
     
     def configure_optimizers(self):
         
-        optimizer = optim.Adam(self.model.parameters(), lr=3e-4)
+        optimizer = optim.Adam(self.model.parameters(), lr=1.41e-4)
         """linear = optim.lr_scheduler.LinearLR(optimizer,
                                             start_factor=1e-5,
                                             end_factor=1e-4,
@@ -69,38 +70,43 @@ class LightningModel(L.LightningModule):
         return self._step(batch, "valid")
     
     @staticmethod
-    def masking(outs, inputs):
+    def pad(outs, inputs):
 
         if outs.size(2) >= inputs.size(2) and outs.size(3) >= inputs.size(3):
             padding_rows = outs.size(2) - inputs.size(2)  
             padding_cols = outs.size(3) - inputs.size(3)
             padded = F.pad(inputs, (0, padding_cols, 0, padding_rows))  
-            masked = outs * masked
 
-        elif outs.size(2) < inputs.size(2) and outs.size(3) < inputs.size(3):
+        elif outs.size(2) <= inputs.size(2) and outs.size(3) <= inputs.size(3):
             padding_rows =  - (outs.size(2) - inputs.size(2) )
             padding_cols = -(outs.size(3) - inputs.size(3))
             padded = F.pad(outs, (0, padding_cols, 0, padding_rows))  
-            masked = inputs * padded
 
-        return masked
+        return padded
+    
+
+    def forward(self, mixed_waveforms, speech_waveforms):
+        
+
+        stft_mixed = self.stft(mixed_waveforms).to(self.device)
+        stft_clean = self.stft(speech_waveforms).to(self.device)
+
+        output = self.model(stft_mixed)
+        if output.shape != stft_clean.shape:
+            output = self.pad(output, stft_clean)
+
+        return output, stft_clean
     
     def _step(self, batch, kind):
-        mixed_waveforms, speech_waveforms = batch
 
-        stft_mixed = librosa.stft(mixed_waveforms.cpu().detach().numpy(), n_fft = self.n_fft, hop_length= self.hop_length)
-        x = torch.tensor(np.abs(stft_mixed), requires_grad=True).to(self.device)
-        mask = self.model(x)
-        masked = self.masking(mask, x)
-        reverse_clear_mixed = librosa.istft(masked.cpu().detach().numpy(), n_fft=self.n_fft, hop_length=self.hop_length)
-        cleaned = torch.tensor(reverse_clear_mixed, requires_grad=True).to(self.device)
-        cleaned = cleaned[:, 0, None, :]
+        mixed_waveforms, speech_waveforms = batch
+        output, stft_clean = self.forward( mixed_waveforms, speech_waveforms)
         
-        loss = self.mse(cleaned, speech_waveforms)
-        metric = self.sisdr(cleaned, speech_waveforms)
+        loss = self.mse(output, stft_clean)
+        #metric = self.sisdr(cleaned, speech_waveforms)
         
         metrics = {
-            f"{kind}_metric": metric,
+            f"{kind}_metric": loss,
             f"{kind}_loss": loss,
         }
         self.log_dict(
@@ -113,3 +119,9 @@ class LightningModel(L.LightningModule):
         return loss
     
 
+model = SpectrogramLightningModel(model_attributes)
+trainer = L.Trainer(accelerator="auto",max_epochs=100,logger=True)                  
+                            
+                            
+
+trainer.fit(model, train_loader, val_loader)

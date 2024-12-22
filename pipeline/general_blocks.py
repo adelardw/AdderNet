@@ -115,7 +115,8 @@ class AdaptiveResBlock(nn.Module):
                                        inverted=inverted,
                                        do_bn=do_bn)
         if not downscaling:
-            self.scale = nn.Upsample(scale_factor=2)
+            self.scale = nn.ConvTranspose2d(out_channels, out_channels, stride=2,
+                                            kernel_size=2,padding=0, output_padding=0) #nn.Upsample(scale_factor=2)
         elif downscaling:
             self.scale = nn.MaxPool2d(kernel_size=2)
         else:
@@ -123,12 +124,8 @@ class AdaptiveResBlock(nn.Module):
 
         if self.do_sc:
 
-            if inverted:
-                self.adapt_res = nn.ConvTranspose2d(in_channels, out_channels,
-                                                    kernel_size=1, bias=False) if in_channels != out_channels else \
-                                nn.Identity()
-            else:
-                self.adapt_res = nn.Conv2d(in_channels, out_channels,
+            
+            self.adapt_res = nn.Conv2d(in_channels, out_channels,
                                            kernel_size=1, bias=False) if in_channels != out_channels else \
                                  nn.Identity()
             
