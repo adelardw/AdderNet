@@ -56,9 +56,6 @@ class SpectrogramLightningModel(L.LightningModule):
         self.mse = nn.MSELoss()
         self.sisdr = SiSDRLoss() 
         
-    def forward(self, x):
-        return self.model(x)
-    
     def configure_optimizers(self):
         
         optimizer = optim.Adam(self.model.parameters(), lr=1.41e-4)
