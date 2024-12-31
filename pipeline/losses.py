@@ -23,6 +23,21 @@ class SiSDRLoss(nn.Module):
 
         return  -(10 * (torch.log10(proj_norm**2 / (diff_norm**2 + self.eps )))).mean()
 
+class SDR(nn.Module):
+
+    def __init__(self, eps = 1e-12):
+        super().__init__()
+        self.eps = eps
+    
+    def forward(self, x, y, y_hat):
+
+        alpha = torch.norm(y, dim=-1, keepdim=True)**2 / (torch.norm(y, dim=-1, keepdim=True)**2 + torch.norm(x - y, dim=-1, keepdim=True)**2 + self.eps)
+        loss_p1 = -alpha * (torch.sum(y * y_hat, dim=-1) / (torch.norm(y, dim=-1, keepdim=True) * torch.norm(y_hat, dim=-1, keepdim=True) + self.eps))
+        loss_p2 = -(torch.ones_like(alpha) - alpha) * (torch.sum((x - y) * (x - y_hat), dim=-1) / (torch.norm((x - y), dim=-1, keepdim=True) * torch.norm((x - y_hat), dim=-1, keepdim=True) + self.eps)) 
+
+        return (loss_p1 + loss_p2).mean()
+    
+
 
 class CIRMLoss(nn.Module):
     def __init__(self, k: int | float = 10, c: float  = 0.1):

@@ -3,31 +3,9 @@ import torch.nn as nn
 from pipeline.general_blocks import *
 from pipeline.encoder import *
 from pipeline.decoder import *
+import torchaudio
+from typing import Any
 
-def get_stft_out_size(N, n_fft = 512,  hop_length = 128, center = True):
-    """
-
-    Args:
-        N (int): num signal pts
-        n_fft (int): num pts for FT. Defaults to 512.
-        hop_length (int): Window step. Defaults to 128.
-        center (bool): if center == True - use padding reflect mode for calc stft. Defaults to True.
-
-    Returns:
-        tuple: Tuple of F, T
-    """
-    if center:
-        N_padded = N + 2 * (n_fft // 2)
-        T = 1 + (N_padded - n_fft) // hop_length
-        F = 1 + n_fft // 2
-
-    
-    else:
-        T = 1 + (N - n_fft) // hop_length
-        F = 1 + n_fft // 2
-
-
-    return F, T
 
 class DenoisingModel(nn.Module):
     def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
@@ -49,13 +27,11 @@ class DenoisingModel(nn.Module):
                                                         do_sc = True,
                                                         dp = 0.4,
                                                         num_blocks = 3),
-                        input_signal_size: int = 80000,
-                        n_fft: int = 512,
-                        hop_length: int = 128,
-                        center: bool = True,
+
+                        input_shape: tuple = (512, 512),
                         hidden_gru: int = 2048,
                         num_gru_cells: int = 2,
-                        dp_gru = 0.3):
+                        dp_gru: float = 0.3):
         """
         General: See Encoder and Decoder Models for understanding
         Args:
@@ -92,28 +68,26 @@ class DenoisingModel(nn.Module):
 
         assert encoder_parameters['out_channels'][-1] == decoder_parameters['in_channels']
         
-        input_stft_size = get_stft_out_size(N=input_signal_size, n_fft=n_fft,hop_length=hop_length, center=center)
     
         num_encoder_blocks = encoder_parameters['num_blocks']
         features_scaling = 2**num_encoder_blocks
-        scaled_frequnecy = input_stft_size[0] // features_scaling
+        scaled_frequnecy = input_shape[0] // features_scaling
 
         self.encoder = SpectrumEncoder(**encoder_parameters)
-        
         
         self.gru = nn.GRU(input_size=encoder_parameters['out_channels'][-1] * scaled_frequnecy, 
                           hidden_size=hidden_gru,
                           batch_first=True,
                           dropout=dp_gru,
                           num_layers=num_gru_cells,
-                          bias=False)
+                          bias=False,
+                          bidirectional=True)
         
         self.tanh = nn.Tanh()
-        self.linear = nn.Linear(hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy, bias=False)
+        self.linear = nn.Linear(2 * hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy, bias=False)
+        self.tanh_gru = nn.Tanh()
+
         self.decoder = SpectrumDecoder(**decoder_parameters)
-
-        
-
 
     def forward(self, x):
 
@@ -129,6 +103,7 @@ class DenoisingModel(nn.Module):
         gru_out, hidden = self.gru(x)
         out = self.tanh(gru_out)
         out = self.linear(out)
+        out = self.tanh_gru(out)
         decoder_input = out.view(batch_size, channels,frequency, time)
 
         decoded = self.decoder(decoder_input)

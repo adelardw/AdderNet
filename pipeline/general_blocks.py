@@ -49,15 +49,16 @@ class BaseBlock(nn.Sequential):
         
         assert kernel_size % 2 != 0, 'Kernel must be odd'
             
-        pad = kernel_size // 2
+        pad = kernel_size // 2 
         if inverted:
             self.conv_inverted = nn.ConvTranspose2d(in_channels, out_channels, kernel_size,padding = pad)
         else:
-            #self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding = pad)
-            self.conv = OutMaskedConv2d(in_channels, out_channels, kernel_size, padding = pad)
-        self.nb =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
-        self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding = pad)
+            #self.conv = OutMaskedConv2d(in_channels, out_channels, kernel_size, padding = pad)
+        
         self.act = act_func
+        self.bn =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
+        self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
 
 
 
@@ -116,7 +117,7 @@ class AdaptiveResBlock(nn.Module):
                                        do_bn=do_bn)
         if not downscaling:
             self.scale = nn.ConvTranspose2d(out_channels, out_channels, stride=2,
-                                            kernel_size=2,padding=0, output_padding=0) #nn.Upsample(scale_factor=2)
+                                            kernel_size=2,padding=0, output_padding=0) 
         elif downscaling:
             self.scale = nn.MaxPool2d(kernel_size=2)
         else:

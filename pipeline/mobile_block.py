@@ -27,10 +27,10 @@ class MobileBlock(nn.Sequential):
         super().__init__()
     
 
-        assert kernel_size % 2 != 0, 'Kernel must be odd'
+        #assert kernel_size % 2 != 0, 'Kernel must be odd'
             
           
-        pad = kernel_size // 2  
+        pad = kernel_size // 2 
         if inverted:
             self.conv_inverted = nn.ConvTranspose2d(in_channels, out_channels,kernel_size=kernel_size,padding=pad)
             
@@ -48,6 +48,7 @@ class MobileBlock(nn.Sequential):
             #self.point_wise = nn.Conv2d(out_channels, out_channels, kernel_size=1,padding=pad)
             self.point_wise = nn.OutMaskedConv2d(out_channels, out_channels, kernel_size=1,padding=pad)
         
-        self.nb =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
-        self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
+        self.bn =  nn.BatchNorm2d(out_channels) if do_bn else nn.Identity()
         self.act = act_func
+        self.dropout = nn.Dropout2d(dp) if dp > 0 else nn.Identity()
+        
