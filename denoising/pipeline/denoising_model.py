@@ -1,0 +1,365 @@
+import torch
+import torch.nn as nn
+from pipeline.general_blocks import *
+from pipeline.encoder import *
+from pipeline.decoder import *
+import torchaudio
+from typing import Any
+
+
+class DenoisingModel(nn.Module):
+    def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
+                                                        out_channels = [64, 96, 128],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+                                                        
+                        decoder_parameters: dict = dict(in_channels=128,
+                                                        out_channels = [96, 64, 3],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+
+                        input_shape: tuple = (512, 512),
+                        hidden_gru: int = 2048,
+                        num_gru_cells: int = 2,
+                        dp_gru: float = 0.3):
+        """
+        General: See Encoder and Decoder Models for understanding
+        Args:
+            encoder_parameters (dict): Dict of Encoder Parameters. Defaults to dict(in_channels=3,
+                                                                                    out_channels = [64, 96, 128],
+                                                                                    kernel_sizes = [3, 5, 7],
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True,
+                                                                                    dp = 0.4, 
+                                                                                    num_blocks = 3).
+
+            decoder_parameters (dict): Dict of Decoder Parameters. Defaults to dict(in_channels=128, 
+                                                                                    out_channels = [96, 64, 3],
+                                                                                    kernel_sizes = [3, 5, 7], 
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True, 
+                                                                                    dp = 0.4,
+
+            input_signal_size (int): num signal pts: sample rate * num signal seconds.Defaults to 80000.
+            n_fft (int): num pts for FT. Defaults to 512.
+            hop_length (int): Window step. Defaults to 128.
+            center (bool): if center == True - use padding reflect mode for calc stft. Defaults to True.
+
+            hidden_gru (int): num of gru hidden neurons. Defaults to 512.
+            num_gru_cells (int): num of gru cells. Defaults to 2.
+            dp_gru (float): dropout for gru each gru cells. Defaults to 0.3.
+        """
+        super().__init__()
+
+
+        assert encoder_parameters['out_channels'][-1] == decoder_parameters['in_channels']
+        
+    
+        num_encoder_blocks = encoder_parameters['num_blocks']
+        features_scaling = 2**num_encoder_blocks
+        scaled_frequnecy = input_shape[0] // features_scaling
+
+        self.encoder = SpectrumEncoder(**encoder_parameters)
+        
+        self.gru = nn.GRU(input_size=encoder_parameters['out_channels'][-1] * scaled_frequnecy, 
+                          hidden_size=hidden_gru,
+                          batch_first=True,
+                          dropout=dp_gru,
+                          num_layers=num_gru_cells,
+                          bias=False,
+                          bidirectional=True)
+        
+        self.tanh = nn.Tanh()
+        self.linear = nn.Linear(2 * hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy, bias=False)
+        self.tanh_gru = nn.Tanh()
+
+        self.decoder = SpectrumDecoder(**decoder_parameters)
+
+    def forward(self, x):
+
+        encoded = self.encoder(x)
+
+        batch_size, channels, frequency, time = encoded.shape
+        input_size = frequency * channels
+
+        x = encoded.permute(0, 3, 2, 1)
+
+        x = x.reshape(batch_size, time, input_size)
+        
+        gru_out, hidden = self.gru(x)
+        out = self.tanh(gru_out)
+        out = self.linear(out)
+        out = self.tanh_gru(out)
+        decoder_input = out.view(batch_size, channels,frequency, time)
+
+        decoded = self.decoder(decoder_input)
+
+        return decoded
+    
+    
+
+class DenoisingModelV2(nn.Module):
+    def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
+                                                        out_channels = [64, 96, 128],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+                                                        
+                        decoder_parameters: dict = dict(in_channels=128,
+                                                        out_channels = [96, 64, 3],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3)):
+        """
+        General: See Encoder and Decoder Models for understanding
+        Args:
+            encoder_parameters (dict): Dict of Encoder Parameters. Defaults to dict(in_channels=3,
+                                                                                    out_channels = [64, 96, 128],
+                                                                                    kernel_sizes = [3, 5, 7],
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True,
+                                                                                    dp = 0.4, 
+                                                                                    num_blocks = 3).
+
+            decoder_parameters (dict): Dict of Decoder Parameters. Defaults to dict(in_channels=128, 
+                                                                                    out_channels = [96, 64, 3],
+                                                                                    kernel_sizes = [3, 5, 7], 
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True, 
+                                                                                    dp = 0.4,
+
+        """
+        super().__init__()
+
+
+        assert encoder_parameters['out_channels'][-1] == decoder_parameters['in_channels']
+        
+        self.encoder = SpectrumEncoder(**encoder_parameters)
+        self.act = nn.Tanh()
+        self.decoder = SpectrumDecoder(**decoder_parameters)
+
+    def forward(self, x):
+
+        x = self.encoder(x)
+        x = self.act(x)
+        return self.decoder(x)
+    
+    
+
+
+class DenoisingModelUnet(nn.Module):
+    def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
+                                                        out_channels = [64, 96, 128],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+                                                        
+                        decoder_parameters: dict = dict(in_channels=128,
+                                                        out_channels = [96, 64, 3],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3)):
+        """
+        General: See Encoder and Decoder Models for understanding
+        Args:
+            encoder_parameters (dict): Dict of Encoder Parameters. Defaults to dict(in_channels=3,
+                                                                                    out_channels = [64, 96, 128],
+                                                                                    kernel_sizes = [3, 5, 7],
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True,
+                                                                                    dp = 0.4, 
+                                                                                    num_blocks = 3).
+
+            decoder_parameters (dict): Dict of Decoder Parameters. Defaults to dict(in_channels=128, 
+                                                                                    out_channels = [96, 64, 3],
+                                                                                    kernel_sizes = [3, 5, 7], 
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True, 
+                                                                                    dp = 0.4,
+
+        """
+        super().__init__()
+
+
+        assert encoder_parameters['out_channels'][-1] == decoder_parameters['in_channels']
+        
+        self.encoder = SpectrumEncoder(**encoder_parameters)
+        self.act = nn.Tanh()
+        self.decoder = SpectrumDecoder(**decoder_parameters)
+
+    def forward(self, x):
+
+        sc = []
+        encoder_features = self.encoder.encoder_features
+        decoder_features = self.decoder.decoder_features
+
+        for name, module in encoder_features.named_children():
+            x = module(x)
+            sc.append(x)
+        
+        x = self.act(x)
+        sc = sc[:-1][::-1]
+        for i, (name, module) in enumerate(decoder_features.named_children()):
+            x = module(x)
+            
+            if i < len(sc):
+                x += sc[i]
+        
+        return x
+    
+    
+    
+
+class DenoisingModelUnetRNN(nn.Module):
+    def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
+                                                        out_channels = [64, 96, 128],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+                                                        
+                        decoder_parameters: dict = dict(in_channels=128,
+                                                        out_channels = [96, 64, 3],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = nn.SiLU(),
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+
+                        input_shape: tuple = (512, 512),
+                        hidden_gru: int = 2048,
+                        num_gru_cells: int = 2,
+                        dp_gru: float = 0.3):
+        """
+        General: See Encoder and Decoder Models for understanding
+        Args:
+            encoder_parameters (dict): Dict of Encoder Parameters. Defaults to dict(in_channels=3,
+                                                                                    out_channels = [64, 96, 128],
+                                                                                    kernel_sizes = [3, 5, 7],
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True,
+                                                                                    dp = 0.4, 
+                                                                                    num_blocks = 3).
+
+            decoder_parameters (dict): Dict of Decoder Parameters. Defaults to dict(in_channels=128, 
+                                                                                    out_channels = [96, 64, 3],
+                                                                                    kernel_sizes = [3, 5, 7], 
+                                                                                    use_mobile = False,
+                                                                                    act_func = nn.SiLU(),
+                                                                                    do_bn = True,
+                                                                                    do_sc = True, 
+                                                                                    dp = 0.4,
+
+            input_signal_size (int): num signal pts: sample rate * num signal seconds.Defaults to 80000.
+            n_fft (int): num pts for FT. Defaults to 512.
+            hop_length (int): Window step. Defaults to 128.
+            center (bool): if center == True - use padding reflect mode for calc stft. Defaults to True.
+
+            hidden_gru (int): num of gru hidden neurons. Defaults to 512.
+            num_gru_cells (int): num of gru cells. Defaults to 2.
+            dp_gru (float): dropout for gru each gru cells. Defaults to 0.3.
+        """
+        super().__init__()
+
+
+        assert encoder_parameters['out_channels'][-1] == decoder_parameters['in_channels']
+        
+    
+        num_encoder_blocks = encoder_parameters['num_blocks']
+        features_scaling = 2**num_encoder_blocks
+        scaled_frequnecy = input_shape[0] // features_scaling
+
+        self.encoder = SpectrumEncoder(**encoder_parameters)
+        
+        self.gru = nn.GRU(input_size=encoder_parameters['out_channels'][-1] * scaled_frequnecy, 
+                          hidden_size=hidden_gru,
+                          batch_first=True,
+                          dropout=dp_gru,
+                          num_layers=num_gru_cells,
+                          bias=False,
+                          bidirectional=True)
+        
+        self.tanh = nn.Tanh()
+        self.linear = nn.Linear(2 * hidden_gru, encoder_parameters['out_channels'][-1]* scaled_frequnecy, bias=False)
+        self.tanh_gru = nn.Tanh()
+
+        self.decoder = SpectrumDecoder(**decoder_parameters)
+
+    def forward(self, x):
+
+        sc = []
+        encoder_features = self.encoder.encoder_features
+        decoder_features = self.decoder.decoder_features
+
+        for name, module in encoder_features.named_children():
+            x = module(x)
+            sc.append(x)
+            
+        sc = sc[:-1][::-1]
+        
+
+        batch_size, channels, frequency, time = x.shape
+        input_size = frequency * channels
+
+        x = x.permute(0, 3, 2, 1)
+
+        x = x.reshape(batch_size, time, input_size)
+        
+        x, hidden = self.gru(x)
+        x = self.tanh(x)
+        x = self.linear(x)
+        x = self.tanh_gru(x)
+        x = x.view(batch_size, channels,frequency, time)
+
+        for i, (name, module) in enumerate(decoder_features.named_children()):
+            x = module(x)
+            
+            if i < len(sc):
+                x += sc[i]
+                
+        return x
