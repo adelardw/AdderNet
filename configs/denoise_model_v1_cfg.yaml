@@ -1,0 +1,31 @@
+encoder_parameters: 
+  in_channels: 2
+  out_channels: [8, 32, 32, 64, 64, 128, 128, 256]
+  kernel_sizes: [9, 7, 7, 5, 5, 3, 3, 3]
+  use_mobile: True
+  act_func:  'elu'
+  do_bn: [True]
+  do_sc: [True]
+  dp : [0.2, 0.2, 0.4]
+  num_blocks: 8
+
+decoder_parameters:  
+  in_channels: 256 
+  out_channels:  [128, 128, 64, 64, 32, 32, 8, 1] 
+  kernel_sizes: [3, 3, 3, 5, 5, 7, 7, 9]
+  use_mobile: False
+  act_func: 'elu'
+  do_bn: [True]
+  do_sc: [True]
+  dp: [0.3, 0.4, 0.4]
+  num_blocks: 8
+
+stft_attributes:
+  n_fft: 2046
+  hop_length: 123
+  win_length: 256
+  center: False
+  normalized: False
+  power: null
+
+audio_len: 128000
