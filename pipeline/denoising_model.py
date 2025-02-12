@@ -247,7 +247,74 @@ class DenoisingModelUnet(nn.Module):
         return x
 
 
-class DenoisingModelComplexUnet(nn.Module):
+class DenoisingModelComplexUnet_v1(nn.Module):
+    def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
+                                                        out_channels = [64, 96, 128],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = 'elu',
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3),
+                                                        
+                        decoder_parameters: dict = dict(in_channels=128,
+                                                        out_channels = [96, 64, 3],
+                                                        kernel_sizes = [3, 5, 7],
+                                                        use_mobile = False, 
+                                                        act_func = 'elu',
+                                                        do_bn = True,
+                                                        do_sc = True,
+                                                        dp = 0.4,
+                                                        num_blocks = 3)):
+        """
+        General: See Encoder and Decoder Models for understanding
+        Args:
+            encoder_parameters (dict): Dict of Encoder Parameters. Defaults to dict(in_channels=3,
+                                                                                    out_channels = [64, 96, 128],
+                                                                                    kernel_sizes = [3, 5, 7],
+                                                                                    use_mobile = False,
+                                                                                    act_func = 'elu',
+                                                                                    do_bn = True,
+                                                                                    do_sc = True,
+                                                                                    dp = 0.4, 
+                                                                                    num_blocks = 3).
+
+            decoder_parameters (dict): Dict of Decoder Parameters. Defaults to dict(in_channels=128, 
+                                                                                    out_channels = [96, 64, 3],
+                                                                                    kernel_sizes = [3, 5, 7], 
+                                                                                    use_mobile = False,
+                                                                                    act_func = 'elu',
+                                                                                    do_bn = True,
+                                                                                    do_sc = True, 
+                                                                                    dp = 0.4,
+
+        """
+        super().__init__()
+        encoder_parameters = deepcopy(encoder_parameters) 
+        decoder_parameters = deepcopy(decoder_parameters)
+        
+        encoder_parameters['in_channels'] = 2 * encoder_parameters['in_channels'] 
+        decoder_parameters['out_channels'][-1] = 2 * decoder_parameters['out_channels'][-1] 
+
+        self.model = DenoisingModelUnet(encoder_parameters=encoder_parameters,
+                                        decoder_parameters=decoder_parameters)
+        
+        
+
+    def forward(self, x):
+        
+        magnitude = torch.abs(x)
+        phase = torch.angle(x)
+        x_concat = torch.cat([magnitude, phase], dim=1)
+        out = self.model(x_concat)
+        out_magnitude, out_phase = torch.chunk(out, 2, dim=1)
+        
+        return out_magnitude, out_phase
+    
+
+
+class DenoisingModelComplexUnet_v2(nn.Module):
     def __init__(self,  encoder_parameters: dict = dict(in_channels=3,
                                                         out_channels = [64, 96, 128],
                                                         kernel_sizes = [3, 5, 7],
@@ -307,7 +374,8 @@ class DenoisingModelComplexUnet(nn.Module):
         x_concat = torch.cat([x.real, x.imag], dim=1)
         out = self.model(x_concat)
         out_real, out_imag = torch.chunk(out, 2, dim=1)
-        return torch.complex(out_real, out_imag)
+        
+        return out_real, out_imag
         
     
 

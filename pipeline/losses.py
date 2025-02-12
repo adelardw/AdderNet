@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class SiSDRLoss(nn.Module):
     def __init__(self, eps: float = 1e-9):
@@ -56,25 +57,43 @@ class CIRMLoss(nn.Module):
         return self.k * nn.functional.tanh(self.c* x / 2)
 
 
-class SpectralConvergengeLoss(torch.nn.Module):
-    """Spectral convergence loss module."""
+class SpectralConvergengeLoss(nn.Module):
 
-    def __init__(self):
-        """Initilize spectral convergence loss module."""
-        super(SpectralConvergengeLoss, self).__init__()
+    def forward(self, output, target):
 
-    def forward(self, x_mag, y_mag):
-        """Calculate forward propagation.
-        Args:
-            x_mag (Tensor): Magnitude spectrogram of predicted signal (B, #frames, #freq_bins).
-            y_mag (Tensor): Magnitude spectrogram of groundtruth signal (B, #frames, #freq_bins).
-        Returns:
-            Tensor: Spectral convergence loss value.
-        """
-        return torch.norm(y_mag - x_mag, p="fro") / torch.norm(y_mag, p="fro")
+        return torch.norm(target - output, p="fro") / torch.norm(target, p="fro")
 
-class CMSE(nn.Module):
+class ComponentMSE(nn.Module):
     
     def forward(self, output, target):
         
-        return nn.functional.mse_loss(output.real, target.real) + nn.functional.mse_loss(output.imag, target.imag)
+        return F.mse_loss(output.real, target.real) + F.mse_loss(output.imag, target.imag)
+
+class CircularMSE(nn.Module):
+    def forward(self, output, target):
+        
+        return torch.min(F.mse_loss(output, target), 2*torch.pi - F.mse_loss(output, target))
+    
+
+class AntiWrappingLoss(nn.Module):
+    """
+    Args:
+        See https://arxiv.org/pdf/2305.13686 formula (9) and next sequences
+    """    
+        
+    def forward(self, output, target):
+        delta = target - output
+        calc = torch.abs(delta - 2*torch.pi*torch.round(delta / (2 * torch.pi)))
+        return calc.mean()
+    
+class LogMagnitudeLoss(nn.Module):
+    def __init__(self, eps= 1e-5):
+        super().__init__()
+        self.eps = eps
+        
+    def forward(self, output, target):
+        
+        log_trc = torch.log(target + self.eps)
+        log_out = torch.log(output + self.eps)
+        return F.mse_loss(log_out, log_trc)
+    
