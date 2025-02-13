@@ -232,18 +232,15 @@ class DenoisingModelUnet(nn.Module):
         encoder_features = self.encoder.encoder_features
         decoder_features = self.decoder.decoder_features
 
-        for name, module in encoder_features.named_children():
+        for module in encoder_features.children():
             x = module(x)
             sc.append(x)
         
         x = self.act(x)
-        sc = sc[:-1][::-1]
-        for i, (name, module) in enumerate(decoder_features.named_children()):
-            x = module(x)
-            
-            if i < len(sc):
-                x += sc[i]
-        
+        sc = sc[::-1]
+        for module, skp in zip(decoder_features.children(), sc):
+            x = module(x + skp)  
+
         return x
 
 
