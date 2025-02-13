@@ -58,7 +58,7 @@ def bench_model(model,metrics, num_iters=100, loader=test_loader):
     model.eval()
     cpu = []
     gpu = []
-    for i, batch in enumerate(test_loader):
+    for i, batch in enumerate(loader):
         
         model = model.to('cpu')
         mixed, clean = batch
@@ -111,9 +111,9 @@ print('-'*20 + '+GPU+' + '-'*20)
 print('Avg GPU Inference [s] : ', torch.tensor(gpu).mean().item())
 print('-'*20 + '-----' + '-'*20)
 print('-'*19 + 'METRICS' + '-'*19 )
-print(f"SNR : {metric_values['snr']}"),
-print(f"SDR: {metric_values['sdr']}")
-print(f"SI-SDR {metric_values['sisdr']}")
-print(f"SI-SNR {metric_values['sisnr']}")
+print(f"SNR [dB]: {metric_values['snr']}"),
+print(f"SDR [dB]: {metric_values['sdr']}")
+print(f"SI-SDR [dB]: {metric_values['sisdr']}")
+print(f"SI-SNR [dB]: {metric_values['sisnr']}")
 print('-'*19 + '-------' + '-'*19 )
 print(" "*50)
