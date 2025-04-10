@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from pipeline.general_blocks import *
-from pipeline.encoder import *
-from pipeline.decoder import *
+from utils.general_blocks import *
+from utils.encoder import *
+from utils.decoder import *
 import torchaudio
 from typing import Any
 from copy import deepcopy

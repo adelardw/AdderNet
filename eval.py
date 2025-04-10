@@ -1,5 +1,5 @@
-from lightning_module import *
-from pipeline import cfg_loader
+from lightning_modules.lightning_module import *
+from utils import cfg_loader
 
 ckpt_path = 'configs/last.ckpt'
 cfg_path = 'configs/denoise_model_v1_cfg.yaml'

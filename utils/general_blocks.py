@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from pipeline.masked_conv import *
-from pipeline.mobile_block import MobileBlock
+from utils.masked_conv import *
+from utils.mobile_block import MobileBlock
 
 def list_fn(num_blocks, params):
     """

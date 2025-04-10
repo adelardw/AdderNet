@@ -96,4 +96,19 @@ class LogMagnitudeLoss(nn.Module):
         log_trc = torch.log(target + self.eps)
         log_out = torch.log(output + self.eps)
         return F.mse_loss(log_out, log_trc)
+
+class PhaseSensetiveLoss(nn.Module):
+    def forward(self, rec_mag, clean_mag, out_phase, clean_phase):
+        
+        return torch.mean((clean_mag - rec_mag*torch.cos(clean_phase - out_phase))**2)
     
+class PhaseLoss(nn.Module):
+    
+    def forward(self, clean_phase, out_phase):
+        return torch.mean((torch.cos(clean_phase - out_phase) - 1)**2)
+    
+class GroupDelayLoss(nn.Module):
+    def forward(self, phase, target_phase):
+        grad_phase = torch.diff(phase, dim=2)
+        grad_target = torch.diff(target_phase, dim=2)
+        return F.l1_loss(grad_phase, grad_target)
