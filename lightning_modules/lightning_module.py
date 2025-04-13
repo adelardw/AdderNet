@@ -869,7 +869,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         output_magnitude = self.model(mixed_magnitude)
         output_magnitude = self.pad_or_trim(output_magnitude, stft_mixed)
         output_phase =  self.phase_model(output_magnitude, mixed_phase)
-        cleaned = self.run(mixed_waveforms).to(self.device)
+        cleaned = self.run(mixed_waveforms)
 
         psl_loss = torch.sigmoid(self.alpha)*self.psl_loss(output_magnitude, clean_magnitude, mixed_phase, clean_phase) + \
                 (1 - torch.sigmoid(self.alpha))*self.psl_loss(output_magnitude, clean_magnitude, output_phase, clean_phase)
@@ -881,9 +881,9 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
                             (1 - torch.sigmoid(self.gamma))*self.res_loss(speech_waveforms.to(self.device), cleaned.to(self.device)) + \
                             self.spectral_loss(output_magnitude, clean_magnitude)
         
-        audio_loss = self.metric_loss(cleaned, speech_waveforms)
+        #audio_loss = self.metric_loss(cleaned, speech_waveforms)
 
-        loss = reconstruct_loss + audio_loss + phase_loss + psl_loss
+        loss = reconstruct_loss  + phase_loss + psl_loss #+ audio_loss
                 
         
         #cleaned = torch.tensor(self.run(mixed_waveforms))
