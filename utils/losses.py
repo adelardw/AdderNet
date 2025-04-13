@@ -91,7 +91,7 @@ class MultiResolutionLoss(nn.Module):
             T.Spectrogram(
                 n_fft=n_fft,
                 power=1.0,
-                normalized=True,
+                normalized=False,
                 center=False
             )
             for n_fft in n_ffts])
