@@ -838,8 +838,8 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
                                 win_length=self.stft.win_length, center=self.stft.center,
                                 length=self.audio_len)
         
-        if cleaned.shape[0] > 1 and self.training==False:
-            cleaned = cleaned.reshape(1, -1)
+        """if cleaned.shape[0] > 1 and self.training==False:
+            cleaned = cleaned.reshape(1, -1)"""
             
         return torch.tensor(cleaned)
     
