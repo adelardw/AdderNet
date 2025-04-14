@@ -883,7 +883,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
                             
         
         spectral_loss = torch.sigmoid(self.delta)*self.spectral_loss(output_magnitude, clean_magnitude) + \
-                        (1 - torch.sigmoid(self.delta))*self.log_magnitude(output_magnitude, clean_magnitude)
+                        (1 - torch.sigmoid(self.delta))*self.spectral_loss(mixed_magnitude, clean_magnitude)
                                 
         #audio_loss = self.metric_loss(cleaned, speech_waveforms)
 
