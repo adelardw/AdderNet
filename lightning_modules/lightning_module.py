@@ -696,7 +696,6 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         self.alpha = nn.Parameter(torch.tensor(0.5))  
         self.beta = nn.Parameter(torch.tensor(0.7))   
         self.gamma = nn.Parameter(torch.tensor(0.3))
-        self.delta = nn.Parameter(torch.tensor(0.9)) 
 
         self.stft = torchaudio.transforms.Spectrogram(**stft_attributes)
         self.model = DenoisingModelUnet(encoder_parameters=encoder_parameters,
@@ -706,7 +705,6 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         self.l2_loss = nn.MSELoss()
         self.l1_loss = nn.L1Loss()
         self.spectral_loss = SpectralConvergengeLoss()
-        self.log_spectrum_loss = LogMagnitudeLoss()
         self.psl_loss = PhaseSensetiveLoss()
         self.phase_loss = PhaseLoss()
         self.group_delay_loss = GroupDelayLoss()
@@ -723,7 +721,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         optimizer = optim.Adam([
             {'params': self.model.parameters()},
             {'params': self.phase_model.parameters(), 'lr': 1e-4},  # Меньший LR для phase_model
-            {'params': [self.alpha, self.beta, self.gamma, self.delta], 'lr': 1e-3}         # Отдельный LR для коэффициентов
+            {'params': [self.alpha, self.beta, self.gamma], 'lr': 1e-3}         # Отдельный LR для коэффициентов
         ], lr=3.41e-4)
 
 
@@ -893,9 +891,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
                             (1 - torch.sigmoid(self.gamma))*self.l1_loss(output_magnitude, clean_magnitude)
                             
         
-        spectral_loss = torch.sigmoid(self.delta)*self.spectral_loss(output_magnitude, clean_magnitude) + \
-                        (1 - torch.sigmoid(self.delta))*self.log_spectrum_loss(output_magnitude, clean_magnitude)
-        
+        spectral_loss = self.spectral_loss(output_magnitude, clean_magnitude)        
 
         loss = reconstruct_loss  + phase_loss + psl_loss + spectral_loss
                 
