@@ -113,7 +113,7 @@ class OldSpectrogramLightningModelUnet(L.LightningModule):
         self.metric['sisnratio'].update(cleaned_wf, clean_wf)
      
     
-    def forward(self, mixed_waveforms):
+    def get_mag_phase(self, mixed_waveforms):
 
         if mixed_waveforms.shape[0] == 1 and mixed_waveforms.ndim==2:
             mixed_waveforms = mixed_waveforms.repeat((2, 1))
@@ -143,7 +143,7 @@ class OldSpectrogramLightningModelUnet(L.LightningModule):
     
     def run(self, mixed_waveforms):
         
-        out, phase = self.forward(mixed_waveforms)
+        out, phase = self.get_mag_phase(mixed_waveforms)
         cleaned_stft = (out * torch.exp(1j * phase)).numpy()
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
                                 win_length=self.stft.win_length, center=self.stft.center)
@@ -307,7 +307,7 @@ class SpectrogramLightningModelUnet(L.LightningModule):
         self.metric['sisnratio'].update(cleaned_wf, clean_wf)
      
     
-    def forward(self, mixed_waveforms):
+    def get_mag_phase(self, mixed_waveforms):
         
         if isinstance(mixed_waveforms, np.ndarray):
             mixed_waveforms = torch.tensor(mixed_waveforms)
@@ -342,7 +342,7 @@ class SpectrogramLightningModelUnet(L.LightningModule):
     
     def run(self, mixed_waveforms):
         
-        mag, phase = self.forward(mixed_waveforms)
+        mag, phase = self.get_mag_phase(mixed_waveforms)
         
         cleaned_stft = (mag * torch.exp(1j * phase)).detach().cpu().numpy()
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
@@ -540,7 +540,7 @@ class GiGaSpectrogramLightningModelUnet(L.LightningModule):
         self.metric['sisnratio'].update(cleaned_wf, clean_wf)
      
     
-    def forward(self, mixed_waveforms):
+    def get_mag_phase(self, mixed_waveforms):
         
         if isinstance(mixed_waveforms, np.ndarray):
             mixed_waveforms = torch.tensor(mixed_waveforms)
@@ -577,19 +577,25 @@ class GiGaSpectrogramLightningModelUnet(L.LightningModule):
        
         return mag_padded, phase_padded
     
-    def run(self, mixed_waveforms):
+    def forward(self, mixed_waveforms):
         
-        out, phase = self.forward(mixed_waveforms)
+        out, phase = self.get_mag_phase(mixed_waveforms)
         
         cleaned_stft = (out * torch.exp(1j * phase)).detach().cpu().numpy()
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
                                 win_length=self.stft.win_length, center=self.stft.center)
         
+        return torch.tensor(cleaned)
+    
+    def run(self, mixed_waveforms):
+
+        cleaned = self.forward(mixed_waveforms)
         if cleaned.shape[0] > 1:
             cleaned = cleaned.reshape(1, -1)
-
+        
         return cleaned
     
+
     def _step(self, batch, kind):
 
         mixed_waveforms, speech_waveforms = batch
@@ -629,7 +635,7 @@ class GiGaSpectrogramLightningModelUnet(L.LightningModule):
                 phase_loss + psl_loss
                 
         
-        cleaned = torch.tensor(self.run(mixed_waveforms))
+        cleaned = torch.tensor(self.forward(mixed_waveforms))
         self.compute_metrics(cleaned, speech_waveforms)
     
         metrics = {
@@ -690,20 +696,20 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         self.alpha = nn.Parameter(torch.tensor(0.5))  
         self.beta = nn.Parameter(torch.tensor(0.7))   
         self.gamma = nn.Parameter(torch.tensor(0.3))
-        self.delta = nn.Parameter(torch.tensor(0.9))
+        self.delta = nn.Parameter(torch.tensor(0.9)) 
 
         self.stft = torchaudio.transforms.Spectrogram(**stft_attributes)
         self.model = DenoisingModelUnet(encoder_parameters=encoder_parameters,
                                                decoder_parameters=decoder_parameters)
         
         self.phase_model = PhaseCorrectorDilation()
-        self.loss_fn = nn.MSELoss()
+        self.l2_loss = nn.MSELoss()
+        self.l1_loss = nn.L1Loss()
         self.spectral_loss = SpectralConvergengeLoss()
+        self.log_spectrum_loss = LogMagnitudeLoss(eps=1e-6)
         self.psl_loss = PhaseSensetiveLoss()
         self.phase_loss = PhaseLoss()
         self.group_delay_loss = GroupDelayLoss()
-        self.log_magnitude =LogMagnitudeLoss()
-        self.metric_loss = SiSDRLoss()
         self.audio_len = audio_len
         self.metric = dict(snratio = SNR(),
                             sdratio = SDR(),
@@ -791,7 +797,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         self.metric['sisnratio'].update(cleaned_wf, clean_wf)
      
     
-    def forward(self, mixed_waveforms):
+    def get_mag_phase(self, mixed_waveforms):
         
         if isinstance(mixed_waveforms, np.ndarray):
             mixed_waveforms = torch.tensor(mixed_waveforms)
@@ -821,28 +827,33 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         phase = torch.angle(stft_mixed).to(self.device) 
         magnitude = torch.abs(stft_mixed).to(self.device)
         
-        
-        output_magnitude = self.model(magnitude)
-        mag_padded = self.pad_or_trim(output_magnitude, magnitude)
-        output_phase =  self.phase_model(mag_padded, phase)
-        phase_padded = self.pad_or_trim(output_phase, phase)
+        with torch.no_grad():
+            output_magnitude = self.model(magnitude)
+            mag_padded = self.pad_or_trim(output_magnitude, magnitude)
+            output_phase =  self.phase_model(mag_padded, phase)
+            phase_padded = self.pad_or_trim(output_phase, phase)
        
         return mag_padded, phase_padded
     
-    def run(self, mixed_waveforms):
+    def forward(self, mixed_waveforms):
         
-        out, phase = self.forward(mixed_waveforms)
+        out, phase = self.get_mag_phase(mixed_waveforms)
         
         cleaned_stft = (out * torch.exp(1j * phase)).detach().cpu().numpy()
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
                                 win_length=self.stft.win_length, center=self.stft.center,
                                 length=self.audio_len)
         
-        """if cleaned.shape[0] > 1 and self.training==False:
-            cleaned = cleaned.reshape(1, -1)"""
-            
         return torch.tensor(cleaned)
     
+    def run(self, mixed_waveforms):
+
+        cleaned = self.forward(mixed_waveforms)
+        if cleaned.shape[0] > 1:
+            cleaned = cleaned.reshape(1, -1)
+        
+        return cleaned
+
     def _step(self, batch, kind):
 
         mixed_waveforms, speech_waveforms = batch
@@ -870,7 +881,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         output_magnitude = self.model(mixed_magnitude)
         output_magnitude = self.pad_or_trim(output_magnitude, stft_mixed)
         output_phase =  self.phase_model(output_magnitude, mixed_phase)
-        cleaned = self.run(mixed_waveforms)
+        
 
         psl_loss = torch.sigmoid(self.alpha)*self.psl_loss(output_magnitude, clean_magnitude, mixed_phase, clean_phase) + \
                 (1 - torch.sigmoid(self.alpha))*self.psl_loss(output_magnitude, clean_magnitude, output_phase, clean_phase)
@@ -878,19 +889,17 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         phase_loss = torch.sigmoid(self.beta) * self.phase_loss(clean_phase, output_phase) + \
                 (1 - torch.sigmoid(self.beta)) * self.group_delay_loss(output_phase, clean_phase)
 
-        reconstruct_loss =   torch.sigmoid(self.gamma)*self.loss_fn(output_magnitude, clean_magnitude) + \
-                            (1 - torch.sigmoid(self.gamma))*self.loss_fn(mixed_magnitude, clean_magnitude)
+        reconstruct_loss =   torch.sigmoid(self.gamma)*self.l2_loss(output_magnitude, clean_magnitude) + \
+                            (1 - torch.sigmoid(self.gamma))*self.l1_loss(output_magnitude, clean_magnitude)
                             
         
         spectral_loss = torch.sigmoid(self.delta)*self.spectral_loss(output_magnitude, clean_magnitude) + \
-                        (1 - torch.sigmoid(self.delta))*self.spectral_loss(mixed_magnitude, clean_magnitude)
-                                
-        #audio_loss = self.metric_loss(cleaned, speech_waveforms)
-
-        loss = reconstruct_loss  + phase_loss + psl_loss + spectral_loss #+ audio_loss
-                
+                        (1 - torch.sigmoid(self.delta))*self.log_spectrum_loss(output_magnitude, clean_magnitude)
         
-        #cleaned = torch.tensor(self.run(mixed_waveforms))
+
+        loss = reconstruct_loss  + phase_loss + psl_loss + spectral_loss
+                
+        cleaned = self.forward(mixed_waveforms)
         self.compute_metrics(cleaned.to('cpu'), speech_waveforms)
     
         metrics = {
