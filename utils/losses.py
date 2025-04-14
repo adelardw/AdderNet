@@ -60,8 +60,8 @@ class LogMagnitudeLoss(nn.Module):
         
     def forward(self, output, target):
         
-        log_trc = torch.log(target + 1)
-        log_out = torch.log(output + 1)
+        log_trc = torch.log(torch.abs(target) + 1)
+        log_out = torch.log(torch.abs(output) + 1)
         return F.l1_loss(log_out, log_trc)
 
 class PhaseSensetiveLoss(nn.Module):
