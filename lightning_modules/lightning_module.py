@@ -706,7 +706,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         self.l2_loss = nn.MSELoss()
         self.l1_loss = nn.L1Loss()
         self.spectral_loss = SpectralConvergengeLoss()
-        self.log_spectrum_loss = LogMagnitudeLoss(eps=1e-6)
+        self.log_spectrum_loss = LogMagnitudeLoss()
         self.psl_loss = PhaseSensetiveLoss()
         self.phase_loss = PhaseLoss()
         self.group_delay_loss = GroupDelayLoss()
