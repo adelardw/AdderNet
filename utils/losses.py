@@ -57,15 +57,12 @@ class AntiWrappingLoss(nn.Module):
         return calc.mean()
     
 class LogMagnitudeLoss(nn.Module):
-    def __init__(self, eps= 1e-5):
-        super().__init__()
-        self.eps = eps
         
     def forward(self, output, target):
         
-        log_trc = torch.log(target + self.eps)
-        log_out = torch.log(output + self.eps)
-        return F.mse_loss(log_out, log_trc)
+        log_trc = torch.log(target + 1)
+        log_out = torch.log(output + 1)
+        return F.l1_loss(log_out, log_trc)
 
 class PhaseSensetiveLoss(nn.Module):
     def forward(self, rec_mag, clean_mag, out_phase, clean_phase):
