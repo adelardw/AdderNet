@@ -98,8 +98,13 @@ class MultiResolutionLoss(nn.Module):
         for transform in self.transforms:
             transform.window = transform.window.to(clean.device)
             
-            S_clean = transform(clean).log1p()
-            S_enhanced = transform(enhanced).log1p()
+            S_clean = transform(clean)
+            S_enhanced = transform(enhanced)
             losses.append(F.l1_loss(S_clean, S_enhanced))
             
         return torch.mean(torch.stack(losses))
+
+class STFTLoss(nn.Module):
+
+    def forward(self, stft_true, stft_pred):        
+        return torch.mean(torch.abs(stft_true - stft_pred))

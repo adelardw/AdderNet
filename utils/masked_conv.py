@@ -53,4 +53,3 @@ class OutWeightMaskedConv2d(nn.Conv2d):
         output = super().forward(x)
         mask = torch.tril(torch.ones_like(output)).to(output.device)
         return output * mask
-    
