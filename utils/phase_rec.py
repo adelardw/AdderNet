@@ -36,30 +36,6 @@ class PhaseCorrectorDilation(nn.Module):
     
 
 
-class MambaPhaseCorrector(nn.Module):
-    def __init__(self, d_model=4):
-        super().__init__()
-        self.conv_in = nn.Conv2d(2, d_model, kernel_size=3, padding=1)
-        self.mamba = Mamba(
-            d_model=d_model, 
-            d_state=4,  
-            d_conv=4,    
-            expand=2             )
-        self.conv_out = nn.Conv2d(d_model, 1, kernel_size=1)
-
-    def forward(self, mag, phase):
-        x = torch.cat([mag, phase], dim=1)  # [B, 2, F, T]
-        x = self.conv_in(x)  # [B, d_model, F, T]
-        
-        
-        B, C, F, T = x.shape
-        x = x.permute(0, 2, 3, 1).reshape(B * F, T, C)  # [B*F, T, d_model]
-        x = self.mamba(x)  
-        x = x.reshape(B, F, T, C).permute(0, 3, 1, 2)  # [B, C, F, T]
-        
-        return phase + torch.tanh(self.conv_out(x))  # Residual + коррекция
-    
-
 class EnhancedPhaseCorrector(nn.Module):
     def __init__(self, num_channels=32, num_layers=5, dilation_groups=[1,2,4,8]):
         super().__init__()

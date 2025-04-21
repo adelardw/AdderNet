@@ -108,3 +108,12 @@ class STFTLoss(nn.Module):
 
     def forward(self, stft_true, stft_pred):        
         return torch.mean(torch.abs(stft_true - stft_pred))
+
+class TripletLoss(nn.Module):
+    def __init__(self, margin=0.1):
+        super().__init__()
+        self.margin = margin
+        self.component_mse = ComponentMSE()
+    def forward(self, anchor, pos, neg):
+
+        return F.relu(self.component_mse(anchor, pos) - self.component_mse(anchor, neg) + self.margin).mean()   
