@@ -1,6 +1,5 @@
 pesq==0.0.4
 pystoi==0.4.1
-GPUtil
 datasets
 soundfile
 librosa
@@ -10,4 +9,4 @@ torchmetrics==1.6.1
 lightning
 lightning[extra]
 soundfile==0.13.1
-mamba-ssm
+mamba-ssm==2.2.4
