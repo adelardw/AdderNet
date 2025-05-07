@@ -1,2 +1,1 @@
-from lightning_modules.complex_lighntning_module import *
-from lightning_modules.complex_lighntning_module import *
+from lightning_modules.lightning_module import *
