@@ -366,7 +366,7 @@ class SpectrogramLightningModelUnet(L.LightningModule):
         if cleaned.shape[0] > 1:
             cleaned = cleaned.reshape(1, -1)
         
-        return cleaned[...,:self.audio_len].reshape(1, 1, self.audio_len)
+        return cleaned[...,:self.audio_shape].reshape(cleaned.shape[0], 1, self.audio_shape)
 
 
     
@@ -724,7 +724,6 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
                                                decoder_parameters=decoder_parameters)
         
         self.phase_model = PhaseCorrectorDilation()
-        #self.phase_model = CompatiblePhaseCorrector()
         self.l2_loss = nn.MSELoss()
         self.l1_loss = nn.L1Loss()
         self.spectral_loss = SpectralConvergengeLoss()
@@ -843,7 +842,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
             mixed_waveforms = torch.cat(torch.split(mixed_waveforms, 
                                                     split_size_or_sections=self.audio_len, dim=-1))[:, None, :]
   
-        if mixed_waveforms.shape[-1] <= self.audio_len:
+        elif mixed_waveforms.shape[-1] <= self.audio_len:
             self.audio_shape = mixed_waveforms.shape[-1]
             need2pad = self.audio_len - self.audio_shape
             mixed_waveforms = F.pad(mixed_waveforms,(0, need2pad))
@@ -858,18 +857,17 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
             mag_padded = self.pad_or_trim(output_magnitude, magnitude)
             output_phase =  self.phase_model(mag_padded, phase)
             phase_padded = self.pad_or_trim(output_phase, phase)
-
+        
         return mag_padded, phase_padded
-    
+
     def forward(self, mixed_waveforms):
         
         out, phase = self.get_mag_phase(mixed_waveforms)
-        
-        cleaned_stft = (out * torch.exp(1j * phase)).detach().cpu().numpy()
+        cleaned_stft = (out * torch.exp(1j * phase)).detach().cpu().numpy()       
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
                                 win_length=self.stft.win_length, center=self.stft.center,
-                                length=self.audio_shape)
-        
+                                length=self.audio_len)
+
         return torch.tensor(cleaned)
     
     def run(self, mixed_waveforms):
@@ -878,7 +876,7 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
         if cleaned.shape[0] > 1:
             cleaned = cleaned.reshape(1, -1)
 
-        return cleaned[...,:self.audio_shape].reshape(1, 1, self.audio_shape)
+        return cleaned[...,:self.audio_shape].reshape(cleaned.shape[0], 1, self.audio_shape)
 
     def _step(self, batch, kind):
 
@@ -923,12 +921,11 @@ class UltraSpectrogramLightningModelUnet(L.LightningModule):
 
         loss = reconstruct_loss  + phase_loss + psl_loss + spectral_loss + 0.1*stft_loss  
                 
-        
         self.compute_metrics(cleaned.to('cpu'), speech_waveforms)
     
         metrics = {
-            f"{kind}_loss": loss,
-        }
+            f"{kind}_loss": loss}
+
         self.log_dict(
             metrics,
             prog_bar=True,
@@ -1008,7 +1005,6 @@ class UltraMaxSpectrogramLightningModelUnet(L.LightningModule):
         
     def configure_optimizers(self):
         
-        #optimizer = optim.Adam(self.model.parameters(), lr=3.41e-4)
         
         optimizer = optim.Adam([
             {'params': self.model.parameters()},
@@ -1109,9 +1105,9 @@ class UltraMaxSpectrogramLightningModelUnet(L.LightningModule):
             need2pad =  self.audio_len * num_audio_segments_in_wf - self.audio_shape
             mixed_waveforms = F.pad(mixed_waveforms,(0, need2pad))
             mixed_waveforms = torch.cat(torch.split(mixed_waveforms, 
-                                                    split_size_or_sections=self.audio_len, dim=-1)) #[:, None, :]
+                                                    split_size_or_sections=self.audio_len, dim=-1))[:, None, :]
   
-        if mixed_waveforms.shape[-1] <= self.audio_len:
+        elif mixed_waveforms.shape[-1] <= self.audio_len:
             self.audio_shape = mixed_waveforms.shape[-1]
             need2pad = self.audio_len - self.audio_shape
             mixed_waveforms = F.pad(mixed_waveforms,(0, need2pad))
@@ -1137,7 +1133,7 @@ class UltraMaxSpectrogramLightningModelUnet(L.LightningModule):
         cleaned_stft = (out * torch.exp(1j * phase)).detach().cpu().numpy()
         cleaned = librosa.istft(cleaned_stft, n_fft=self.stft.n_fft,hop_length=self.stft.hop_length,
                                 win_length=self.stft.win_length, center=self.stft.center,
-                                length=self.audio_shape)
+                                length=self.audio_len)
         
         return torch.tensor(cleaned)
     
@@ -1147,7 +1143,7 @@ class UltraMaxSpectrogramLightningModelUnet(L.LightningModule):
         if cleaned.shape[0] > 1:
             cleaned = cleaned.reshape(1, -1)
 
-        return cleaned[...,:self.audio_shape].reshape(1, 1, self.audio_shape)
+        return cleaned[...,:self.audio_shape].reshape(cleaned.shape[0], 1, self.audio_shape)
 
     def _step(self, batch, kind):
 
