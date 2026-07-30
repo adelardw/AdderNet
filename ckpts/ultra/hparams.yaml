@@ -1,0 +1,70 @@
+encoder_parameters:
+  in_channels: 1
+  out_channels:
+  - 8
+  - 32
+  - 32
+  - 64
+  - 64
+  - 128
+  - 128
+  - 256
+  kernel_sizes:
+  - 9
+  - 7
+  - 7
+  - 5
+  - 5
+  - 3
+  - 3
+  - 3
+  use_mobile: true
+  act_func: elu
+  do_bn:
+  - true
+  do_sc:
+  - true
+  dp:
+  - 0.2
+  - 0.2
+  - 0.4
+  num_blocks: 8
+decoder_parameters:
+  in_channels: 256
+  out_channels:
+  - 128
+  - 128
+  - 64
+  - 64
+  - 32
+  - 32
+  - 8
+  - 1
+  kernel_sizes:
+  - 3
+  - 3
+  - 3
+  - 5
+  - 5
+  - 7
+  - 7
+  - 9
+  use_mobile: false
+  act_func: elu
+  do_bn:
+  - true
+  do_sc:
+  - true
+  dp:
+  - 0.3
+  - 0.4
+  - 0.4
+  num_blocks: 8
+stft_attributes:
+  n_fft: 2046
+  hop_length: 123
+  win_length: 256
+  center: false
+  normalized: false
+  power: null
+audio_len: 128000

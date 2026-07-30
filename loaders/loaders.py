@@ -154,10 +154,8 @@ class SpeechNoiseDataset(Dataset):
         """
         speech_path = self.speech_files[idx]
         noise_path = random.choice(self.noise_files)
-
         speech_waveform, speech_sr = torchaudio.load(speech_path)
         noise_waveform, noise_sr = torchaudio.load(noise_path)
-
         if speech_sr != self.sample_rate:
             resampler = Resample(orig_freq=speech_sr,
                                  new_freq=self.sample_rate)
